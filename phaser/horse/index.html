@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>hello horse!</title>
+  <script src="phaser.min.js"></script>
+</head>
+<body>
+
+  <script type="text/javascript">
+
+  window.onload = function() {
+
+    var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create });
+
+    function preload () {
+
+      game.load.image('horse', 'assets/horse.gif');
+
+    }
+
+    function create () {
+
+      var horse = game.add.sprite(0, game.world.centerY, 'horse');
+
+      var tween = game.add.tween(horse);
+      tween.to({ x: 600 }, 6000);
+
+      tween.start();
+
+    }
+
+  };
+
+  </script>
+
+</body>
+</html>
