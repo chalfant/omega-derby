@@ -11,25 +11,53 @@
 
   window.onload = function() {
 
-    var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create });
+    var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+    var horses = [];
+    var raceOver = false;
 
     function preload () {
 
-      game.load.image('horse', 'assets/horse.gif');
+      game.load.image('horse1', 'assets/horse.gif');
+      game.load.image('horse2', 'assets/horse2.gif');
+      game.load.image('horse3', 'assets/horse3.gif');
+      game.load.image('horse4', 'assets/horse4.gif');
+      game.load.image('horse5', 'assets/horse5.gif');
+
 
     }
 
     function create () {
 
-      var horse = game.add.sprite(0, game.world.centerY, 'horse');
+      var margin = 100;
+      var pad = 15;
+      var horseHeight = 64;
+      for (var i=0; i<5; i++) {
+        var y_pos = margin + i * (pad + horseHeight);
+        horses[i] = game.add.sprite(0, y_pos, 'horse'+(i+1));
+        // var tween = game.add.tween(horses[i]);
+        // tween.to({ x: 100 + 50*Math.random() }, 1000)
+        //   .to({ x: 200 + 50*Math.random()}, 1000)
+        //   .to({ x: 300 + 50*Math.random()}, 1000)
+        //   .to({ x: 400 + 50*Math.random()}, 1000)
+        //   .to({ x: 600 + 50*Math.random()}, 1000);
 
-      var tween = game.add.tween(horse);
-      tween.to({ x: 600 }, 6000);
-
-      tween.start();
-
+        // tween.start();
+      };
     }
 
+    function update () {
+      if (raceOver) {
+        return;
+      }
+
+      for (var i = horses.length - 1; i >= 0; i--) {
+        horses[i].x += game.rnd.frac()*10;
+
+        if (horses[i].x >= 600) {
+          raceOver = true;
+        }
+      };
+    }
   };
 
   </script>
