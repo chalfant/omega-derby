@@ -13,9 +13,12 @@
 
     var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
     var horses = [];
-    var raceOver = false;
+    var running = false;
 
     function preload () {
+
+      game.load.image('dirt', 'assets/dirt.png');
+      game.load.image('stands', 'assets/grandstands.png');
 
       game.load.image('horse1', 'assets/horse.gif');
       game.load.image('horse2', 'assets/horse2.gif');
@@ -23,13 +26,26 @@
       game.load.image('horse4', 'assets/horse4.gif');
       game.load.image('horse5', 'assets/horse5.gif');
 
+      game.load.audio('sfx', 'assets/post.mp3');
+    }
 
+    function startRace() {
+      running = true;
     }
 
     function create () {
 
-      var margin = 100;
-      var pad = 15;
+      var stands = game.add.sprite(0,0, 'stands');
+
+      this.background = this.add.tileSprite(0,stands.height, this.world.width, 5*64-32, 'dirt');
+
+      var sfx = game.add.audio('sfx');
+      sfx.addMarker('start', 0, 6);
+      sfx.onStop.add(startRace);
+      sfx.play('start');
+
+      var margin = stands.height - 32;
+      var pad = 0;
       var horseHeight = 64;
       for (var i=0; i<5; i++) {
         var y_pos = margin + i * (pad + horseHeight);
@@ -46,7 +62,7 @@
     }
 
     function update () {
-      if (raceOver) {
+      if (!running) {
         return;
       }
 
@@ -54,7 +70,7 @@
         horses[i].x += game.rnd.frac()*10;
 
         if (horses[i].x >= 600) {
-          raceOver = true;
+          running = false;
         }
       };
     }
