@@ -11,14 +11,15 @@
 
   window.onload = function() {
 
+    var scrollSpeed = 200;
+
     var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
     var horses = [];
     var running = false;
 
     function preload () {
 
-      game.load.image('dirt', 'assets/dirt.png');
-      game.load.image('stands', 'assets/grandstands.png');
+      game.load.image('bg', 'assets/background.png');
 
       game.load.image('horse1', 'assets/horse.gif');
       game.load.image('horse2', 'assets/horse2.gif');
@@ -31,48 +32,40 @@
 
     function startRace() {
       running = true;
+      //this.background.autoScroll(-99,0);
+      for (var i = horses.length - 1; i >= 0; i--) {
+        //horses[i].body.velocity.x = 100;
+      };
+    }
+
+    function stopRace() {
+      running = false;
     }
 
     function create () {
 
-      var stands = game.add.sprite(0,0, 'stands');
+      this.background = this.add.tileSprite(0,0, this.world.width, 486, 'bg');
 
-      this.background = this.add.tileSprite(0,stands.height, this.world.width, 5*64-32, 'dirt');
+      this.physics.startSystem(Phaser.Physics.ARCADE);
+
 
       var sfx = game.add.audio('sfx');
       sfx.addMarker('start', 0, 6);
-      sfx.onStop.add(startRace);
+      sfx.onStop.add(startRace, this);
       sfx.play('start');
 
-      var margin = stands.height - 32;
+      var margin = 198 - 32; // stands minus half a horse
       var pad = 0;
       var horseHeight = 64;
       for (var i=0; i<5; i++) {
         var y_pos = margin + i * (pad + horseHeight);
         horses[i] = game.add.sprite(0, y_pos, 'horse'+(i+1));
-        // var tween = game.add.tween(horses[i]);
-        // tween.to({ x: 100 + 50*Math.random() }, 1000)
-        //   .to({ x: 200 + 50*Math.random()}, 1000)
-        //   .to({ x: 300 + 50*Math.random()}, 1000)
-        //   .to({ x: 400 + 50*Math.random()}, 1000)
-        //   .to({ x: 600 + 50*Math.random()}, 1000);
-
-        // tween.start();
+        this.physics.arcade.enableBody(horses[i])
       };
     }
 
     function update () {
-      if (!running) {
-        return;
-      }
 
-      for (var i = horses.length - 1; i >= 0; i--) {
-        horses[i].x += game.rnd.frac()*10;
-
-        if (horses[i].x >= 600) {
-          running = false;
-        }
-      };
     }
   };
 
