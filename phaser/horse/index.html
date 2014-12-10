@@ -12,10 +12,19 @@
   window.onload = function() {
 
     var scrollSpeed = 200;
+    var width = 800;
+    var height = 600;
 
-    var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
     var horses = [];
     var running = false;
+    var scrollSpeed = -100;
+    var finishLine = width - 100;
+    var horseVelocity = 50;
+    var debugText;
+
+    var fanfareEnabled = false; // play opening music?
+
+    var game = new Phaser.Game(width, height, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
     function preload () {
 
@@ -32,40 +41,76 @@
 
     function startRace() {
       running = true;
-      //this.background.autoScroll(-99,0);
+      game.background.autoScroll(scrollSpeed, 0); // px / sec
       for (var i = horses.length - 1; i >= 0; i--) {
-        //horses[i].body.velocity.x = 100;
+        var v = horseVelocity + game.rnd.integerInRange(0,horseVelocity*0.5);
+        horses[i].body.velocity.x = v;
       };
     }
 
     function stopRace() {
       running = false;
+      game.background.autoScroll(0, 0); // px / sec
+      for (var i = horses.length - 1; i >= 0; i--) {
+        horses[i].body.velocity.x = 0;
+      };
+    }
+
+    function setDebug(mesg) {
+      if (debugText) {
+        debugText.destroy();
+      }
+
+      var style = {fill: "#ffffff"};
+      var x = 50, y = game.world.height - 50;
+      debugText = game.add.text(x, y, mesg, style);
     }
 
     function create () {
 
-      this.background = this.add.tileSprite(0,0, this.world.width, 486, 'bg');
+      game.background = game.add.tileSprite(0,0, game.world.width, 486, 'bg');
 
-      this.physics.startSystem(Phaser.Physics.ARCADE);
-
-
-      var sfx = game.add.audio('sfx');
-      sfx.addMarker('start', 0, 6);
-      sfx.onStop.add(startRace, this);
-      sfx.play('start');
+      game.physics.startSystem(Phaser.Physics.ARCADE);
 
       var margin = 198 - 32; // stands minus half a horse
       var pad = 0;
       var horseHeight = 64;
       for (var i=0; i<5; i++) {
-        var y_pos = margin + i * (pad + horseHeight);
-        horses[i] = game.add.sprite(0, y_pos, 'horse'+(i+1));
-        this.physics.arcade.enableBody(horses[i])
+        var y = margin + i * (pad + horseHeight);
+        var key = 'horse'+(i+1);
+        horses[i] = game.add.sprite(0, y, key);
+        game.physics.arcade.enableBody(horses[i]);
       };
+
+      if (fanfareEnabled) {
+        var sfx = game.add.audio('sfx');
+        sfx.addMarker('start', 0, 6);
+        sfx.onStop.add(startRace, this);
+        sfx.play('start');
+      } else {
+        startRace();
+      }
+    }
+
+    function leadHorse() {
+      var leader = horses[0];
+      for (var i = horses.length - 1; i >= 0; i--) {
+        if (horses[i].world.x > leader.world.x) {
+          leader = horses[i];
+        }
+      };
+      return leader;
     }
 
     function update () {
+      var leader = leadHorse();
+      var mesg = "Leader xpos: " + Math.floor(leader.world.x);
 
+      setDebug(mesg);
+
+      if (leader.world.x >= finishLine) {
+        stopRace();
+      }
     }
   };
 
