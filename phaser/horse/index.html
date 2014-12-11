@@ -9,19 +9,25 @@
 
   <script type="text/javascript">
 
+  // TODO:
+  // Put numbers on horses
+  // Blink top two finishers
+  // put horses in group? might make some calcs easier
+
   window.onload = function() {
 
-    var scrollSpeed = 200;
-    var width = 800;
-    var height = 600;
+    var width        = 800;
+    var height       = 600;
+    var scrollSpeed  = -200;
+    var standsHeight = 198;
+    var trackHeight  = 288;
+    var horseHeight  = 64;
+    var raceDuration = 10;
 
     var horses = [];
-    var running = false;
-    var scrollSpeed = -100;
-    var finishLine = width - 100;
-    var horseVelocity = 50;
+    var finishLine;
     var debugText;
-
+    var running        = false;
     var fanfareEnabled = false; // play opening music?
 
     var game = new Phaser.Game(width, height, Phaser.AUTO, '', { preload: preload, create: create, update: update });
@@ -29,6 +35,7 @@
     function preload () {
 
       game.load.image('bg', 'assets/background.png');
+      game.load.image('finish', 'assets/finish.png');
 
       game.load.image('horse1', 'assets/horse.gif');
       game.load.image('horse2', 'assets/horse2.gif');
@@ -42,10 +49,15 @@
     function startRace() {
       running = true;
       game.background.autoScroll(scrollSpeed, 0); // px / sec
+
+      var baseV = (game.world.width - 64) / (raceDuration+1);
+
       for (var i = horses.length - 1; i >= 0; i--) {
-        var v = horseVelocity + game.rnd.integerInRange(0,horseVelocity*0.5);
+        var v = baseV - game.rnd.integerInRange(0,baseV*0.5);
         horses[i].body.velocity.x = v;
       };
+      // hack horse #1 to have max V
+      horses[0].body.velocity.x = baseV
     }
 
     function stopRace() {
@@ -54,6 +66,7 @@
       for (var i = horses.length - 1; i >= 0; i--) {
         horses[i].body.velocity.x = 0;
       };
+      finishLine.body.velocity.x = 0;
     }
 
     function setDebug(mesg) {
@@ -66,20 +79,37 @@
       debugText = game.add.text(x, y, mesg, style);
     }
 
+    // start finish line scrolling to left
+    function spawnFinishLine() {
+      finishLine.body.velocity.x = scrollSpeed;
+    }
+
     function create () {
 
       game.background = game.add.tileSprite(0,0, game.world.width, 486, 'bg');
 
       game.physics.startSystem(Phaser.Physics.ARCADE);
 
-      var margin = 198 - 32; // stands minus half a horse
-      var pad = 0;
-      var horseHeight = 64;
+      // The finishLine sprite starts the game just out of bounds
+      // to the right. We will start it moving to the left
+      // after raceDuration seconds.
+      finishLine = game.add.sprite(game.world.width, standsHeight, 'finish');
+      game.physics.arcade.enableBody(finishLine);
+
+      // Spread the horses out vertically at the starting line
+      var margin = standsHeight - horseHeight/2;
       for (var i=0; i<5; i++) {
-        var y = margin + i * (pad + horseHeight);
+        var y = margin + i * horseHeight;
         var key = 'horse'+(i+1);
-        horses[i] = game.add.sprite(0, y, key);
-        game.physics.arcade.enableBody(horses[i]);
+        var h = game.add.sprite(0, y, key);
+        game.physics.arcade.enableBody(h);
+
+        // Set collision body in rear half of horse so
+        // when it collides with the finish line it
+        // overlaps some.
+        h.body.setSize(32,64,0,0);
+
+        horses[i] = h;
       };
 
       if (fanfareEnabled) {
@@ -90,6 +120,10 @@
       } else {
         startRace();
       }
+
+      // When this event fires, the finish line will appear
+      // and start moving left.
+      game.time.events.add(raceDuration * Phaser.Timer.SECOND, spawnFinishLine);
     }
 
     function leadHorse() {
@@ -102,15 +136,26 @@
       return leader;
     }
 
+    function lastHorse() {
+      var last = horses[0];
+      for (var i = horses.length - 1; i >= 0; i--) {
+        if (horses[i].world.x < last.world.x) {
+          last = horses[i];
+        }
+      };
+      return last;
+    }
+
     function update () {
-      var leader = leadHorse();
-      var mesg = "Leader xpos: " + Math.floor(leader.world.x);
+      //var horse = lastHorse();
+      var horse = leadHorse();
+      var mesg = "Xpos: " + Math.floor(horse.world.x);
+      mesg += "\nTimer: " + game.time.events.duration;
 
       setDebug(mesg);
 
-      if (leader.world.x >= finishLine) {
-        stopRace();
-      }
+      // Stop the race when the lead horse crosses the finish
+      game.physics.arcade.collide(horse, finishLine, stopRace);
     }
   };
 
