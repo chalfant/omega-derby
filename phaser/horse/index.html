@@ -12,8 +12,10 @@
   // TODO:
   // Put numbers on horses
   // Blink top two finishers
-  // make horses rock as they run
   // let all the horses run past the finish line
+  //  ** use bounding box intersection detection to
+  //     find the horses which have crossed, then
+  //     stop the game when all horses have crossed.
 
   window.onload = function() {
 
@@ -31,6 +33,7 @@
     var tick         = 0;
 
     var horses;
+    var rockingTweens = [];
     var finishLine;
     var debugText;
     var running        = false;
@@ -67,7 +70,7 @@
       '#0000ff', // blue
     ];
 
-    var game = new Phaser.Game(width, height, Phaser.AUTO, '', { preload: preload, create: create, update: update, render: render });
+    var game = new Phaser.Game(width, height, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
     function preload () {
 
@@ -90,6 +93,8 @@
 
       running = true;
       game.background.autoScroll(scrollSpeed, 0); // px / sec
+
+      startRockingTweens();
 
       tick = 0;
       setVelocities();
@@ -142,6 +147,8 @@
       game.background.autoScroll(0, 0); // px / sec
       horses.setAll('body.velocity.x', 0);
       finishLine.body.velocity.x = 0;
+
+      stopRockingTweens();
 
       sortHorsesByPosition();
 
@@ -196,16 +203,18 @@
       horses.physicsBodyType = Phaser.Physics.ARCADE;
 
       // Spread the horses out vertically at the starting line
-      var margin = standsHeight - horseHeight/2;
+      var margin = standsHeight;
       for (var i=0; i<5; i++) {
         var y = margin + i * horseHeight;
         var h = horses.create(0, y, 'horse'+(i+1));
         h.name = i+1;
 
+        h.anchor.setTo(0.5,0.5);
+
         // Set collision body in rear half of horse so
         // when it collides with the finish line it
         // overlaps some.
-        h.body.setSize(32,64,0,0);
+        // h.body.setSize(32,64,0,0);
       };
 
       if (fanfareEnabled) {
@@ -216,6 +225,30 @@
       } else {
         startRace();
       }
+    }
+
+    function stopRockingTweens() {
+      game.tweens.removeAll();
+    }
+
+    function startRockingTweens() {
+      var tweenTime = 200;
+      var rockAngle = 10;
+      for (var i = 0; i < horses.total; i++) {
+        var horse = horses.getAt(i);
+        var tween = game.add.tween(horse).to(
+          {angle: -rockAngle},
+          tweenTime,   // time in ms
+          Phaser.Easing.Linear.None)
+        .to(
+          {angle: rockAngle},
+          tweenTime,
+          Phaser.Easing.Linear.None)
+        .loop()
+        .start();
+
+        rockingTweens[i] = tween;
+      };
     }
 
     function leadHorse() {
@@ -236,12 +269,9 @@
         finishLine.body.velocity.x = -leader.body.velocity.x;
       }
 
-      game.physics.arcade.collide(horses, finishLine, stopRace);
-    }
-
-    function render() {
-      // Sprite debug info
-      //game.debug.spriteInfo(horses[0], 32, 32);
+      // if you dont want the line to stop the horses, dont check
+      // for collision.
+      //game.physics.arcade.collide(horses, finishLine, stopRace);
     }
   };
 
