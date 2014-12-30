@@ -12,55 +12,52 @@
   // TODO:
   // Put numbers on horses
   // Blink top two finishers
-  // let all the horses run past the finish line
-  //  ** use bounding box intersection detection to
-  //     find the horses which have crossed, then
-  //     stop the game when all horses have crossed.
+  // Add "yard markers" to give sense of how long the race is
+  // Horse rocking should be proportional to speed.
+  // Show horse times in console
+  // make velocities relative to race length to always
+  //   have race end at certain time.
+  // get velocities from server
+  // get and display odds from server
 
   window.onload = function() {
 
-    var width            = 800;
-    var height           = 600;
-    var scrollSpeed      = -200;
+    var width            = 1200;
+    var height           = 700;
+    var worldWidth       = 5600;
+    var worldHeight      = height;
+
     var standsHeight     = 198;
     var trackHeight      = 288;
     var horseHeight      = 64;
+    var horseWidth       = 64;
+
+    var finishLineMargin = 800;
+    var startLineMargin  = 100;
+    var finishLinePos    = worldWidth - finishLineMargin;
+    var startLinePos     = 0 + startLineMargin;
+    var horseStartPos    = startLinePos - horseWidth / 2;
+
+    var raceDistance     = finishLinePos - horseStartPos;
     var raceDuration     = 30;
-    var finishLineMargin = 100;
+    var meanVelocity     = raceDistance / raceDuration;
 
     var ticks        = 5; // number of velcity changes
     var tickDuration = raceDuration / ticks
     var tick         = 0;
+    var startTime;
 
     var horses;
     var rockingTweens = [];
+    var raceResult    = [];
+    var raceTimes     = [];
     var finishLine;
     var debugText;
+    var winnerText;
     var running        = false;
     var fanfareEnabled = false; // play opening music?
 
-    var vectors = [
-      [16,22,31,16,37],
-      [21,22,15,16,48],
-      [16,15,13,21,58],
-      [15,21,14,28,44],
-      [35,17,16,31,23],
-      [19,28,33,27,15],
-      [30,27,16,29,20],
-      [12,33,14,37,26],
-      [20,21,19,33,28],
-      [31,31,12,35,13],
-      [18,29,13,14,49],
-      [24,16,21,23,38],
-      [13,21,19,17,52],
-      [21,19,26,13,44],
-      [29,32,24,13,25],
-      [21,27,20,26,28],
-      [13,28,33,15,33],
-      [14,29,32,26,21],
-      [28,25,23,20,26],
-      [29,19,14,17,44]
-    ];
+    var vectors = [[0.9181917,0.9172015,1.302685,0.9847966,0.9546909,0.9837506149896265],[0.9015069,1.245733,0.9822684,1.239168,0.9554028,0.9321586455471975],[1.220588,1.338934,1.301042,0.8720097,1.235329,0.8432963688215852],[1.339022,1.250362,0.8859208,0.8242174,0.9296858,0.9506912980708105],[0.9713153,1.017643,0.9139286,0.8582232,0.5655615,1.2381097015974387],[1.11928,0.9442925,0.6095986,1.013901,0.9303577,1.0822415292526735],[0.9126019,1.098782,1.345821,1.084818,1.085881,0.9027694747398656],[1.336612,0.823512,1.116318,0.9186517,1.250427,0.9287410300641301],[1.004336,1.12398,1.033578,1.078728,0.9265052,0.9639230950889429],[1.19071,0.6028866,1.405149,0.6095986,1.005703,1.0369796649706722],[0.4122808,1.235329,1.117288,0.9048928,0.9696245,1.0743761940833796],[1.124445,0.949067,0.978163,0.9022208,1.301042,0.9608102121222836],[1.027746,0.9429613,0.9849259,0.8821587,1.11928,1.0076706632835393],[1.235329,0.6095986,0.5089497,1.087697,0.9193113,1.1390419980696418],[0.9865211,1.200794,1.080122,1.11928,0.9874209,0.9242191450474665],[0.7494123,0.5386774,0.7243553,1.027998,1.162042,1.1372609595866585],[1.005707,1.039674,1.111334,0.8347135,0.5089497,1.1963344511255238],[1.039674,1.102063,1.220588,0.8261195,1.091179,0.9487483721735848],[1.302685,1.084818,1.10786,0.7538846,0.834582,0.9799109973615534],[0.690771,0.8772471,0.9131553,1.152982,1.009292,1.070654003004086]];
 
     var horseColors = [
       '#ff0000', // red
@@ -86,18 +83,98 @@
       game.load.audio('sfx', 'assets/post.mp3');
     }
 
+    function create () {
+
+      var mesg = "raceDistance: " + raceDistance;
+      mesg += "\nraceDuration: " + raceDuration;
+      mesg += "\nmeanVelocity: " + meanVelocity;
+
+      console.log(mesg);
+
+      game.world.setBounds(0,0,worldWidth,worldHeight);
+
+      game.background = game.add.tileSprite(0,0, game.world.width, 486, 'bg');
+
+      game.physics.startSystem(Phaser.Physics.ARCADE);
+
+      finishLine = game.add.sprite(game.world.width - finishLineMargin, standsHeight, 'finish');
+
+      startLine = game.add.sprite(startLineMargin, standsHeight, 'finish');
+
+      horses = game.add.group();
+      horses.enableBody = true;
+      horses.physicsBodyType = Phaser.Physics.ARCADE;
+
+      // Spread the horses out vertically at the starting line
+      var margin = standsHeight;
+      for (var i=0; i<5; i++) {
+        var x = startLineMargin - horseWidth / 2;
+        var y = margin + i * horseHeight;
+        var h = horses.create(x, y, 'horse'+(i+1));
+        h.name = i+1;
+
+        h.anchor.setTo(0.5,0.5);
+      };
+
+      if (fanfareEnabled) {
+        var sfx = game.add.audio('sfx');
+        sfx.addMarker('start', 0, 6);
+        sfx.onStop.add(startRace, this);
+        sfx.play('start');
+      } else {
+        startRace();
+      }
+    }
+
+    function resetRace() {
+      console.log("Resetting race.");
+
+      // tween the horses back to the starting line
+      for (var i = 0; i < horses.total; i++) {
+        var currentHorse = horses.getAt(i);
+        var tween = game.add.tween(currentHorse);
+        tween.to({x: startLineMargin - horseWidth / 2}, 5000, Phaser.Easing.Linear.None, true, 5000, false);
+      };
+
+      // or could tween the camera back and when
+      // the horses are off screen teleport them back
+      // to the start
+
+    }
+
     function startRace() {
       console.log("Starting race.");
+
+      raceResult = [];
 
       chooseVelocities(); // pick random velocity vectors
 
       running = true;
-      game.background.autoScroll(scrollSpeed, 0); // px / sec
 
+      createHorseRockingTweens();
       startRockingTweens();
 
       tick = 0;
       setVelocities();
+      startTime = game.time.now;
+    }
+
+    function stopRace() {
+      console.log("Stopping race.");
+
+      // stop all timers
+      game.time.removeAll();
+
+      running = false;
+
+      stopRockingTweens();
+
+      horses.setAll('body.velocity.x', 0);
+      horses.setAll('angle', 0);
+
+      displayWinners();
+
+      //resetRace();
     }
 
     function shuffle(array) {
@@ -116,22 +193,26 @@
 
     function chooseVelocities() {
       vectors = shuffle(vectors);
-      for (var i = 0; i < horses.total; i++) {
-        vectors[i] = shuffle(vectors[i]);
-      };
     }
 
     function setVelocities() {
       for (var i = 0; i < horses.total; i++) {
         if (running) {
           var horse = horses.getAt(i);
-          horse.body.velocity.x = vectors[i][tick];
-          console.log("tick: " + tick + " horse" + (i+1) + " " + horse.body.velocity.x);
+          var horseIndex = parseInt(horse.name);
+          var velocity = vectors[horseIndex][tick] * meanVelocity;
+          horse.body.velocity.x = velocity;
+          var ptime = vectors[horseIndex][5] * raceDuration;
+          console.log("tick: " + tick +
+            " horse" + horseIndex +
+            " v: " + game.math.roundTo(horse.body.velocity.x, -2) +
+            " ptime: " + game.math.roundTo(ptime, -2));
         }
       };
-      if (tick < ticks-1) {
+
+      tick++;
+      if (tick < ticks) {
         game.time.events.add(Phaser.Timer.SECOND*tickDuration, setVelocities);
-        tick++;
       }
     }
 
@@ -139,31 +220,13 @@
       horses.sort('x', Phaser.Group.SORT_DESCENDING);
     }
 
-    function stopRace() {
-      console.log("Stopping race.");
-
-      running = false;
-
-      game.background.autoScroll(0, 0); // px / sec
-      horses.setAll('body.velocity.x', 0);
-      finishLine.body.velocity.x = 0;
-
-      stopRockingTweens();
-
-      sortHorsesByPosition();
-
-      var first = horses.getAt(0);
-      var second = horses.getAt(1);
-      displayWinners(first, second);
-    }
-
-    function displayWinners(first, second) {
-      var x = 450, y = game.world.height - 100;
+    function displayWinners() {
+      var x = width - 350, y = height - 100;
       //var style = {fill: horseColors[first.name-1]};
       var style = {fill: "#ffffff"};
 
-      token_one = parseInt(first.name);
-      token_two = parseInt(second.name);
+      token_one = parseInt(raceResult[0].name);
+      token_two = parseInt(raceResult[1].name);
 
       if (token_two < token_one) {
         var tmp = token_two;
@@ -173,7 +236,24 @@
 
       mesg = "Winners: " + token_one + " - " + token_two;
       console.log(mesg);
-      winnerText = game.add.text(x, y, mesg, style);
+      if (winnerText == null) {
+        winnerText = game.add.text(x, y, mesg, style);
+        winnerText.fixedToCamera = true;
+      }
+      for (var i = 0; i < raceResult.length; i++) {
+        var horseIndex = parseInt(raceResult[i].name);
+        var horseTime = raceDuration * vectors[horseIndex][5];
+        var predTime = game.math.roundTo(horseTime, -2);
+        var actualTime = game.math.roundTo(raceTimes[horseIndex]/1000, -2);
+        var error = ((raceTimes[horseIndex]/1000) - horseTime) / (raceTimes[horseIndex]/1000);
+        error = game.math.roundTo(error,-2);
+        //var x = game.math.roundTo(raceResult[i].body.x, -1);
+        console.log("horse" + horseIndex +
+          //" xpos: " + x +
+          " ptime: " + predTime +
+          " atime: " + actualTime +
+          " error: " + error);
+      };
     }
 
     function setDebug(mesg) {
@@ -182,61 +262,20 @@
       }
 
       var style = {fill: "#ffffff"};
-      var x = 50, y = game.world.height - 100;
+      var x = 50, y = height - 100;
       debugText = game.add.text(x, y, mesg, style);
-    }
-
-    function create () {
-
-      game.background = game.add.tileSprite(0,0, game.world.width, 486, 'bg');
-
-      game.physics.startSystem(Phaser.Physics.ARCADE);
-
-      // The finishLine sprite starts the game just out of bounds
-      // to the right. We will start it moving to the left
-      // when the lead horse gets to a certain position
-      finishLine = game.add.sprite(game.world.width, standsHeight, 'finish');
-      game.physics.arcade.enableBody(finishLine);
-
-      horses = game.add.group();
-      horses.enableBody = true;
-      horses.physicsBodyType = Phaser.Physics.ARCADE;
-
-      // Spread the horses out vertically at the starting line
-      var margin = standsHeight;
-      for (var i=0; i<5; i++) {
-        var y = margin + i * horseHeight;
-        var h = horses.create(0, y, 'horse'+(i+1));
-        h.name = i+1;
-
-        h.anchor.setTo(0.5,0.5);
-
-        // Set collision body in rear half of horse so
-        // when it collides with the finish line it
-        // overlaps some.
-        // h.body.setSize(32,64,0,0);
-      };
-
-      if (fanfareEnabled) {
-        var sfx = game.add.audio('sfx');
-        sfx.addMarker('start', 0, 6);
-        sfx.onStop.add(startRace, this);
-        sfx.play('start');
-      } else {
-        startRace();
-      }
+      debugText.fixedToCamera = true;
     }
 
     function stopRockingTweens() {
       game.tweens.removeAll();
     }
 
-    function startRockingTweens() {
+    function createHorseRockingTween(horse) {
       var tweenTime = 200;
       var rockAngle = 10;
-      for (var i = 0; i < horses.total; i++) {
-        var horse = horses.getAt(i);
-        var tween = game.add.tween(horse).to(
+
+      var tween = game.add.tween(horse).to(
           {angle: -rockAngle},
           tweenTime,   // time in ms
           Phaser.Easing.Linear.None)
@@ -244,10 +283,23 @@
           {angle: rockAngle},
           tweenTime,
           Phaser.Easing.Linear.None)
-        .loop()
-        .start();
+        .loop();
 
-        rockingTweens[i] = tween;
+      return tween;
+    }
+
+    function createHorseRockingTweens() {
+      for (var i = 0; i < horses.total; i++) {
+        var horse = horses.getAt(i);
+        var tween = createHorseRockingTween(horse);
+        var horseNumber = parseInt(horse.name)-1;
+        rockingTweens[horseNumber] = tween;
+      };
+    }
+
+    function startRockingTweens() {
+      for (var i = 0; i < rockingTweens.length; i++) {
+        rockingTweens[i].start();
       };
     }
 
@@ -256,22 +308,50 @@
       return horses.getAt(0);
     }
 
+    function checkFinishLineCrossed(horse) {
+      var horseBounds = horse.getBounds();
+      var finishBounds = finishLine.getBounds();
+
+      return Phaser.Rectangle.intersects(horseBounds, finishBounds);
+    }
+
     function update () {
       var leader = leadHorse();
 
-      var mesg = "Xpos: " + Math.floor(leader.world.x);
-      mesg += "\nTimer: " + game.time.events.duration;
-      mesg += "\nTick: " + tick;
+      // var mesg = "Xpos: " + Math.floor(leader.world.x);
+      // mesg += "\nTimer: " + game.time.elapsedSince(startTime);
+      // mesg += "\nTick: "  + tick;
 
-      setDebug(mesg);
+      // setDebug(mesg);
 
-      if (leader.world.x >= game.world.width - 2*finishLineMargin) {
-        finishLine.body.velocity.x = -leader.body.velocity.x;
+      if (running) {
+
+        var mesg = "Xpos: " + Math.floor(leader.world.x);
+        mesg += "\nTimer: " + game.time.elapsedSince(startTime);
+        mesg += "\nTick: "  + (tick - 1);
+
+        setDebug(mesg);
+
+        // follow the horse in 3rd position
+        sortHorsesByPosition();
+        game.camera.follow(horses.getAt(2));
+
+        // see if any horses have crossed the finish line
+        for (var i = 0; i < horses.total; i++) {
+          var currentHorse = horses.getAt(i);
+          if (raceResult.indexOf(currentHorse) == -1) {
+            if (checkFinishLineCrossed(currentHorse)) {
+              raceResult.push(currentHorse);
+              var horseIndex = parseInt(currentHorse.name);
+              raceTimes[horseIndex] = game.time.elapsedSince(startTime);
+            }
+          }
+        };
+
+        if (raceResult.length == horses.total) {
+          stopRace();
+        }
       }
-
-      // if you dont want the line to stop the horses, dont check
-      // for collision.
-      //game.physics.arcade.collide(horses, finishLine, stopRace);
     }
   };
 
